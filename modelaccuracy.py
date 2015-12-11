@@ -15,5 +15,5 @@ for inp in inputs:
     model_names = os.listdir(inp)
     for model_name in model_names:
       print_accuracy(model_name)
-#   else:
-#     print_accuracy(model_name
+  else:
+    print_accuracy(inp)
