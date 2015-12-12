@@ -1,5 +1,5 @@
 from gensim.models import Word2Vec
-import sys, json
+import sys, json, os
 
 def save_model_vocab(model_name):
   print "Loading model: " + model_name
@@ -17,12 +17,9 @@ def save_model_vocab(model_name):
   json_str = "{\n"
   for word in sorted(vocab_dict):
     json_str += "    "
-    json_str += "\"" + word + "\": " + json.dumps(vocab_dict[word]) + "\n"
-
-
-
-  # json.dump(vocab_dict, f, indent=4, sort_keys=True)
-  f.write(json_str)
+    json_str += json.dumps(word) + ": " + json.dumps(vocab_dict[word]) + ",\n"
+  json_str
+  f.write(json_str[:-2] + "\n}")
   f.close()
 
 inputs = sys.argv[1:]
@@ -32,5 +29,5 @@ for inp in inputs:
     for model_name in model_names:
       save_model_vocab(model_name)
   else:
-    save_model_vocab(model_name)
+    save_model_vocab(inp)
   
