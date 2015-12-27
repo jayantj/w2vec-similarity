@@ -1,0 +1,13 @@
+embeddings matrix1 w1 = V1 x N1
+chosen words matrix1 c1 = C1 x N1
+topn similarity matrix1 s1 = topn(c1 x w1') = C1 x TN
+
+embeddings matrix2 w2= V2 x N2
+chosen words matrix1 c2 = C1 x N2
+topn similarity matrix1 s2 = topn(c2 x w2') = C1 x TN
+
+sumall(abs(s1-s2))
+
+ebook classifier? cluster? movie clusters? subtitles?
+kmeans clustering where doc distance is word2vec agg similarity?
+
