@@ -1,6 +1,6 @@
 from gensim.models import Word2Vec
 from tqdm import tqdm
-import itertools, random, pdb, sys, cProfile
+import itertools, random, pdb, sys, cProfile, random
 
 def model_similarity_word(given_word, given_model, target_model, topn = 10):
   divergence = 0.0
@@ -35,19 +35,12 @@ def model_similarity(m1, m2):
     combined_vocab[w] = 1
   for w in m2.vocab:
     combined_vocab[w] = 1
-  for m1_word in itertools.islice(m1.vocab, n/2):
-    considered_words[m1_word] = 1
+  for i in range(n/2):
+    m1_word = m1.index2word[random.randint(0,len(m1.vocab)-1)]
     word_divergence = model_similarity_word(m1_word, m1, m2, topn)
     divergence += word_divergence
-    if word_divergence > 10:
-      print word_divergence, m1_word
 
-  for m2_word in itertools.islice(m2.vocab, n/2):
-    # if len(considered_words) >= len(combined_vocab) - len(m2.vocab):
-    #   break
-    # while m2_word in considered_words:
-    #   m2_word = m2.vocab.keys()[random.randint(0, len(m2.vocab)-1)]
-    considered_words[m2_word] = 1
+    m2_word = m2.index2word[random.randint(0,len(m2.vocab)-1)]
     word_divergence = model_similarity_word(m2_word, m2, m1, topn)
     divergence += word_divergence
   divergence /= n
@@ -57,7 +50,7 @@ def model_similarity(m1, m2):
 if len(sys.argv) > 1:
   m1 = Word2Vec.load(sys.argv[1])
   m2 = Word2Vec.load(sys.argv[2])
-  cProfile.run('model_similarity(m1, m2)')
+  cProfile.run('print model_similarity(m1, m2)')
 else:
   m1 = Word2Vec.load('models/text8-model-epochs-1-size-100')
   for epochs in range(1, 10):
