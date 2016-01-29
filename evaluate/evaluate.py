@@ -122,6 +122,21 @@ def evaluate_clusters(model_files = [], similarity_file = ''):
   similarity_data['doc2cluster'] = doc2cluster
   with open(similarity_file, 'w') as f:
     json.dump(similarity_data, f)
+  with open(similarity_file[0:-5]+'-readable-%d' % time.time(), 'w') as f:
+    f.write("cluster document mapping\n")
+    for key, value in cluster2doc.iteritems():
+      f.write(str(key) + "\n\t" + "\n\t".join(sorted(value))+"\n\n")
+    f.write("\ndocument cluster mapping\n")
+    for key in sorted(doc2cluster.keys()):
+      f.write(str(doc2cluster[key]).ljust(3) + "\t" + key + "\n")
+    f.write("\nsimilarity scores\n")
+    for i, row in enumerate(similarity_data['similarity_matrix']):
+      f.write("\n\n"+os.path.basename(model_names[i]))
+      score_strings = {}
+      sorted_indices = [k[0] for k in sorted(enumerate(row), key=lambda x:-x[1])]
+      for index in sorted_indices:
+        f.write("\n\t" + str(round(row[index], 3)).ljust(5) + "\t" + os.path.basename(model_names[index]))
+
   pdb.set_trace()
 
 def tsne_similarity_plot(similarity_file):
