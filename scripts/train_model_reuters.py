@@ -26,8 +26,14 @@ from gensim.models import Word2Vec
 #   print "Trained model for corpus in batch"
 #   model.save('models/batch-model-' + str(time.time())) 
 
-sents = reuters.sents()
+def preprocess_sents(sents = []):
+  preprocessed_sents = []
+  for sent in sents:
+    sent_str = ' '.join(sent).lower()
+    preprocessed_sents.append(sent_str.split())
+  return preprocessed_sents
+sents = gutenberg.sents()
 print "Training on reuters corpus, number of sentences: ", len(sents)
 
-model = Word2Vec(sents)
-model.save("models/reuters-complete-model")
+model = Word2Vec(preprocess_sents(sents),size=200, iter=10)
+model.save("models/gutenberg-complete-model-preprocessed")

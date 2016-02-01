@@ -1,5 +1,6 @@
 from gensim.models import Word2Vec
 import sys, json, os
+from tqdm import tqdm
 
 def save_model_vocab(model_name):
   print "Loading model: " + model_name
@@ -7,7 +8,7 @@ def save_model_vocab(model_name):
   print "Loading model " + model_name +" : Done"
 
   vocab_dict = {}
-  for word in model.vocab:
+  for word in tqdm(model.vocab):
     most_similar = model.most_similar(word)
     most_similar_rounded = [[word_score[0], round(word_score[1], 3)] for word_score in most_similar]
     vocab_dict[word] = {res[0]:res[1] for res in most_similar_rounded}
