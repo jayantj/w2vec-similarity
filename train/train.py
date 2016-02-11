@@ -1,11 +1,11 @@
 from gensim.models import Word2Vec
-from test.gensim.models import Doc2Vec
-from test.gensim.models.doc2vec import TaggedDocument
+from gensim.models import Doc2Vec
+from gensim.models.doc2vec import TaggedDocument
 from glob import glob
-from test.nltk.corpus import PlaintextCorpusReader
+from nltk.corpus import PlaintextCorpusReader
 import importlib, pdb, os, chardet
 
-MODELS_DIR = 'models/gutenberg_all/authors/'
+MODELS_DIR = 'models/gutenberg-top100/doc2vec/'
 
 def train_and_save(sents, output_file, options = {}):
   print "Training model..."
@@ -66,12 +66,14 @@ def read_and_train(root_dir, fileids, output_file='', options={}):
   fileids =  fileids if isinstance(fileids, list) else [fileids]
   fileids = [unicode(f, 'utf8') for f in fileids]
   output_file = output_file or '-'.join(fileids)
-  output_file = "{0}{1}-{2}".format(MODELS_DIR, output_file, options_to_string(options))
+  output_file = u"{0}{1}-{2}".format(MODELS_DIR, output_file, options_to_string(options))
   reader = PlaintextCorpusReader(root=root_dir, fileids=fileids)
   try:
     sents = reader.sents()
+    print fileids
     train_and_save(sents, output_file, options)
   except UnicodeDecodeError:
+    print "here"
     file_encodings = {}
     for fileid in fileids:
       file_content = open(root_dir + fileid).read()
@@ -92,7 +94,7 @@ def read_and_train_doc2vec(root_dir, fileids, output_file='', options={}):
   fileids =  fileids if isinstance(fileids, list) else [fileids]
   fileids = [unicode(f, 'utf8') for f in fileids]
   output_file = output_file or '-'.join(fileids)
-  output_file = "{0}{1}-{2}".format(MODELS_DIR, output_file, options_to_string(options))
+  output_file = u"{0}{1}-{2}".format(MODELS_DIR, output_file, options_to_string(options))
   reader = PlaintextCorpusReader(root=root_dir, fileids=fileids)
   try:
     docs = [ TaggedDocument(reader.words(fileid), [fileid]) for fileid in fileids ]
