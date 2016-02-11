@@ -1,13 +1,16 @@
 from gensim.models import Word2Vec
+from gensim.models import Doc2Vec
 from sklearn.cluster import AffinityPropagation
 from sklearn.manifold import TSNE
+from codecs import open
 import numpy as np
 import matplotlib.pyplot as plt
 import random, sys, pdb, cProfile, time, json, os
 
-def model_similarity(m1, m2, num_chosen_words=100  , topn=10):
+def model_similarity(m1, m2, num_chosen_words=100, topn=10):
   m1.init_sims()
   m2.init_sims()
+  num_chosen_words = 2000
   m1_embedding_size = m1[m1.vocab.keys()[0]].shape[0]
   m2_embedding_size = m2[m2.vocab.keys()[0]].shape[0]
   m1_words = m1.vocab.keys()
@@ -74,6 +77,53 @@ def model_similarity(m1, m2, num_chosen_words=100  , topn=10):
   # return (similarity_sum/(2*topn*num_chosen_words), diff_sum/num_chosen_words)
   return diff_sum/num_chosen_words
 
+def model_similarity_word(given_word, given_model, target_model, topn = 10):
+  divergence = 0.0
+  given_most_similar_dict = {obj[0]:obj[1] for obj in given_model.most_similar(given_word, topn=topn)}
+  if not given_word in target_model:
+    # target_most_similar_dict = {obj[0]:obj[1] for obj in target_model.most_similar(target_model.index2word[0], topn=topn)}
+    divergence += sum(given_most_similar_dict.values())/topn
+  else:
+    target_most_similar_dict = {obj[0]:obj[1] for obj in target_model.most_similar(given_word, topn=topn)}
+    common_words = 0
+    for word, similarity in given_most_similar_dict.iteritems():
+      if word in target_most_similar_dict:
+        divergence += abs(similarity - target_most_similar_dict[word])
+        common_words += 1
+        del target_most_similar_dict[word]
+      elif word in target_model.vocab:
+        divergence += abs(similarity - target_model.similarity(given_word, word))
+      else:
+        divergence += similarity
+    for word, similarity in target_most_similar_dict.iteritems():
+      if word in given_model.vocab:
+        divergence += abs(similarity - given_model.similarity(given_word, word))
+      else:
+        divergence += similarity
+    divergence /= 2 * topn - common_words
+  return divergence
+
+def model_similarity_basic(m1, m2, num_chosen_words=100, topn=10):
+  divergence = 0.0
+  num_chosen_words = 2000
+  topn = 10
+  considered_words = {}
+  combined_vocab = {}
+  for w in m1.vocab:
+    combined_vocab[w] = 1
+  for w in m2.vocab:
+    combined_vocab[w] = 1
+  for i in range(num_chosen_words/2):
+    m1_word = m1.index2word[random.randint(0,len(m1.vocab)-1)]
+    word_divergence = model_similarity_word(m1_word, m1, m2, topn)
+    divergence += word_divergence
+
+    m2_word = m2.index2word[random.randint(0,len(m2.vocab)-1)]
+    word_divergence = model_similarity_word(m2_word, m2, m1, topn)
+    divergence += word_divergence
+  divergence /= num_chosen_words
+  return divergence
+
 def save_similarity_matrix(model_files, output_file=''):
   models = []
   for model_file in model_files:
@@ -91,12 +141,27 @@ def save_similarity_matrix(model_files, output_file=''):
         similarity_matrix[i][j] = 1 - model_similarity(models[i], models[j])
   output_file = output_file or 'models/similarity_matrices/similarities-%d.json' % time.time()
   print output_file
-  with open(output_file, 'w') as f:
+  with open(output_file, 'w', 'utf-8') as f:
+    pdb.set_trace()
     json.dump({"model_names":model_files, "similarity_matrix":similarity_matrix}, f)
   # return output_file
 
 def affinity_propagation_clusters(similarity_matrix, options = {}):
+  pdb.set_trace()
   return AffinityPropagation(affinity='precomputed').fit(similarity_matrix)
+
+def scale_sim_scores(similarity_matrix):
+  max_sim_score = 0.0
+  min_sim_score = 1.0
+  for row in similarity_matrix:
+    for score in row:
+      max_sim_score = score if (score > max_sim_score and score != 1.0) else max_sim_score
+      min_sim_score = score if (score < min_sim_score) else min_sim_score
+
+  for i, row in enumerate(similarity_matrix):
+    for j, score in enumerate(row):
+      similarity_matrix[i][j] = 0.1 + 0.8 * (score-min_sim_score)/(max_sim_score-min_sim_score) if score != 1.0 else score
+  return similarity_matrix
 
 def evaluate_clusters(model_files = [], similarity_file = ''):
   if len(model_files):
@@ -104,9 +169,9 @@ def evaluate_clusters(model_files = [], similarity_file = ''):
     print similarity_file
     pdb.set_trace()
     save_similarity_matrix(model_files, similarity_file)
-  with open(similarity_file) as f:
+  with open(similarity_file, 'r', 'utf-8') as f:
     similarity_data = json.load(f)
-    afp = affinity_propagation_clusters(similarity_data['similarity_matrix'])
+    afp = affinity_propagation_clusters(scale_sim_scores(similarity_data['similarity_matrix']))
   model_names = similarity_data['model_names']
   doc2cluster = {}
   cluster2doc = {}
@@ -120,9 +185,9 @@ def evaluate_clusters(model_files = [], similarity_file = ''):
       cluster2doc[label] = [model_name]
   similarity_data['cluster2doc'] = cluster2doc
   similarity_data['doc2cluster'] = doc2cluster
-  with open(similarity_file, 'w') as f:
+  with open(similarity_file, 'w', 'utf-8') as f:
     json.dump(similarity_data, f)
-  with open(similarity_file[0:-5]+'-readable-%d' % time.time(), 'w') as f:
+  with open(similarity_file[0:-5]+'-readable-%d' % time.time(), 'w', 'utf-8') as f:
     f.write("cluster document mapping\n")
     for key, value in cluster2doc.iteritems():
       f.write(str(key) + "\n\t" + "\n\t".join(sorted(value))+"\n\n")
@@ -136,11 +201,34 @@ def evaluate_clusters(model_files = [], similarity_file = ''):
       sorted_indices = [k[0] for k in sorted(enumerate(row), key=lambda x:-x[1])]
       for index in sorted_indices:
         f.write("\n\t" + str(round(row[index], 3)).ljust(5) + "\t" + os.path.basename(model_names[index]))
-
   pdb.set_trace()
 
+def evaluate_doc2vec_similarities(doc2vec_file):
+  model = Doc2Vec.load(doc2vec_file)
+  model.docvecs.init_sims(True)
+  similarity_matrix = [[None for i in range(len(model.docvecs))] for i in range(len(model.docvecs))]
+  # doc_names = [unicode(tag, 'utf-8') for tag in model.docvecs.doctags.keys()]
+  doc_names = model.docvecs.doctags.keys()
+  for i, doc1 in enumerate(doc_names):
+    for j, doc2 in enumerate(doc_names):
+      # pdb.set_trace()
+      if i is j:
+        similarity_matrix[i][j] = 1.0
+      elif similarity_matrix[j][i]:
+        similarity_matrix[i][j] = similarity_matrix[j][i]
+      else:
+        doc1_vec = model.docvecs[doc1]
+        doc2_vec = model.docvecs[doc2]
+        similarity_matrix[i][j] = round((doc1_vec * doc2_vec).sum(),3)
+  with open('models/similarity_matrices/similarity-'+os.path.basename(doc2vec_file), 'w', 'utf-8') as f:
+    json.dump({"model_names":doc_names, "similarity_matrix":similarity_matrix}, f)
+
+def evaluate_doc2vec_clusters(doc2vec_file):
+  evaluate_doc2vec_similarities(doc2vec_file)
+  evaluate_clusters(similarity_file='models/similarity_matrices/similarity-'+os.path.basename(doc2vec_file))
+
 def tsne_similarity_plot(similarity_file):
-  with open(similarity_file) as f:
+  with open(similarity_file, 'r', 'utf-8') as f:
     similarity_data = json.load(f)
   labels = []
   for model_name in similarity_data['model_names']:
@@ -158,28 +246,3 @@ def tsne_similarity_plot(similarity_file):
         # textcoords = 'offset points',
         bbox = dict(boxstyle = 'round,pad=0.5', fc = 'yellow', alpha = 0.5))
   plt.show()
-  # pdb.set_trace()
-
-def plot_embedding(X, title=None):
-  x_min, x_max = np.min(X, 0), np.max(X, 0)
-  X = (X - x_min) / (x_max - x_min)
-
-  plt.figure()
-  ax = plt.subplot(111)
-  for i in range(X.shape[0]):
-    plt.text(X[i, 0], X[i, 1], str(digits.target[i]), color=plt.cm.Set1(y[i] / 10.), fontdict={'weight': 'bold', 'size': 9})
-
-  if hasattr(offsetbox, 'AnnotationBbox'):
-      # only print thumbnails with matplotlib > 1.0
-    shown_images = np.array([[1., 1.]])  # just something big
-    for i in range(digits.data.shape[0]):
-      dist = np.sum((X[i] - shown_images) ** 2, 1)
-      if np.min(dist) < 4e-3:
-        # don't show points that are too close
-        continue
-      shown_images = np.r_[shown_images, [X[i]]]
-      imagebox = offsetbox.AnnotationBbox(offsetbox.OffsetImage(digits.images[i], cmap=plt.cm.gray_r), X[i])
-      ax.add_artist(imagebox)
-  plt.xticks([]), plt.yticks([])
-  if title is not None:
-    plt.title(title)
