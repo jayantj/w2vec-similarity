@@ -24,7 +24,7 @@ if __name__ == "__main__":
   for option in ('iter', 'size'):
     options[option] = getattr(args, option)
   if (args.files and args.directory) or args.pattern:
-    train.train_from_files(args.files, args.directory, args.pattern, args.separate, options)
+    train.train_from_files(args.files, args.directory, args.pattern, args.separate, args.output_file, options)
   elif isinstance(args.corpuses, list) and len(args.corpuses):
     if args.components_method:
       train.train_from_corpus_components(args.corpuses[0], args.components_method, args.components, output_file=args.output_file, separate=args.separate, options=options)
