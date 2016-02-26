@@ -12,7 +12,7 @@ import mpld3
 import math
 
 SIMILARITY_DIR = 'models/similarity_matrices/new/'
-def model_similarity(m1, m2, num_chosen_words=100, topn=10):
+def model_dissimilarity(m1, m2, num_chosen_words=100, topn=10):
   m1.init_sims()
   m2.init_sims()
   num_chosen_words = 2000
@@ -82,52 +82,48 @@ def model_similarity(m1, m2, num_chosen_words=100, topn=10):
   # return (similarity_sum/(2*topn*num_chosen_words), diff_sum/num_chosen_words)
   return diff_sum/num_chosen_words
 
-def model_similarity_word(given_word, given_model, target_model, topn = 10):
-  divergence = 0.0
+def model_dissimilarity_word(given_word, given_model, target_model, topn = 10):
+  # given_model.most_similar('man') => [(u'woman', 0.8720022439956665), (u'person', 0.8601664304733276)...]
   given_most_similar_dict = {obj[0]:obj[1] for obj in given_model.most_similar(given_word, topn=topn)}
+  dissimilarity = 0.0
+
   if not given_word in target_model:
-    # target_most_similar_dict = {obj[0]:obj[1] for obj in target_model.most_similar(target_model.index2word[0], topn=topn)}
-    divergence += sum(given_most_similar_dict.values())/topn
+    dissimilarity += sum(given_most_similar_dict.values())/topn
   else:
     target_most_similar_dict = {obj[0]:obj[1] for obj in target_model.most_similar(given_word, topn=topn)}
-    common_words = 0
-    for word, similarity in given_most_similar_dict.iteritems():
-      if word in target_most_similar_dict:
-        divergence += abs(similarity - target_most_similar_dict[word])
-        common_words += 1
-        del target_most_similar_dict[word]
-      elif word in target_model.vocab:
-        divergence += abs(similarity - target_model.similarity(given_word, word))
+    union_most_similar_words = set(given_most_similar_dict.keys()) | set(target_most_similar_dict.keys())
+    for word in union_most_similar_words:
+      if word in given_most_similar_dict:
+        similarity_given_model = given_most_similar_dict[word]
+      elif word in given_model.vocab:
+        similarity_given_model = given_model.similarity(given_word, word)
       else:
-        divergence += similarity
-    for word, similarity in target_most_similar_dict.iteritems():
-      if word in given_model.vocab:
-        divergence += abs(similarity - given_model.similarity(given_word, word))
-      else:
-        divergence += similarity
-    divergence /= 2 * topn - common_words
-  return divergence
+        similarity_given_model = 0
 
-def model_similarity_basic(m1, m2, num_chosen_words=100, topn=10):
-  divergence = 0.0
+      if word in target_most_similar_dict:
+        similarity_target_model = target_most_similar_dict[word]
+      elif word in target_model.vocab:
+        similarity_target_model = target_model.similarity(given_word, word)
+      else:
+        similarity_target_model = 0
+      dissimilarity  += abs(similarity_given_model - similarity_target_model)
+    dissimilarity /= len(union_most_similar_words)
+  return dissimilarity
+
+def model_dissimilarity_basic(m1, m2, num_chosen_words=100, topn=10):
+  dissimilarity = 0.0
   num_chosen_words = 2000
   topn = 10
-  considered_words = {}
-  combined_vocab = {}
-  for w in m1.vocab:
-    combined_vocab[w] = 1
-  for w in m2.vocab:
-    combined_vocab[w] = 1
+  m1_words = random.sample(m1.vocab.keys(), num_chosen_words/2)
+  m2_words = random.sample(m2.vocab.keys(), num_chosen_words/2)
   for i in range(num_chosen_words/2):
-    m1_word = m1.index2word[random.randint(0,len(m1.vocab)-1)]
-    word_divergence = model_similarity_word(m1_word, m1, m2, topn)
-    divergence += word_divergence
+    word_dissimilarity = model_dissimilarity_word(m1_words[i], m1, m2, topn)
+    dissimilarity += word_dissimilarity
 
-    m2_word = m2.index2word[random.randint(0,len(m2.vocab)-1)]
-    word_divergence = model_similarity_word(m2_word, m2, m1, topn)
-    divergence += word_divergence
-  divergence /= num_chosen_words
-  return divergence
+    word_dissimilarity = model_dissimilarity_word(m2_words[i], m2, m1, topn)
+    dissimilarity += word_dissimilarity
+  dissimilarity /= num_chosen_words
+  return dissimilarity
 
 def save_similarity_matrix(model_files, output_file=''):
   models = []
@@ -143,7 +139,7 @@ def save_similarity_matrix(model_files, output_file=''):
         similarity_matrix[i][j] = similarity_matrix[j][i]
       else:
         print "evaluating similarities for models %s, %s" % (model_files[i], model_files[j])
-        similarity_matrix[i][j] = 1 - model_similarity(models[i], models[j])
+        similarity_matrix[i][j] = 1 - model_dissimilarity(models[i], models[j])
   output_file = output_file or (SIMILARITY_DIR + '/similarities-%d.json' % time.time())
   print output_file
   with open(output_file, 'w', 'utf-8') as f:
