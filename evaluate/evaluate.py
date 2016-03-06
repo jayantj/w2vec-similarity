@@ -83,7 +83,16 @@ def model_dissimilarity(m1, m2, num_chosen_words=100, topn=10):
   return diff_sum/num_chosen_words
 
 def model_dissimilarity_word(given_word, given_model, target_model, topn = 10):
-  # given_model.most_similar('man') => [(u'woman', 0.8720022439956665), (u'person', 0.8601664304733276)...]
+  """Expects:
+  given_word: word from given_model vocab for which dissimilarity of target_model from given_model is to be computed 
+  given_model, target_model: gensim word2vec model instances to calculate dissimilarity between
+  topn: top n similar words to each sampled word to use for comparison
+
+  Returns:
+  Dissimilarity between two models for given_word, between 0 and 1
+  """
+
+  # given_model.most_similar('man') => [(u'woman', 0.872), (u'person', 0.860)...]
   given_most_similar_dict = {obj[0]:obj[1] for obj in given_model.most_similar(given_word, topn=topn)}
   dissimilarity = 0.0
 
@@ -111,6 +120,15 @@ def model_dissimilarity_word(given_word, given_model, target_model, topn = 10):
   return dissimilarity
 
 def model_dissimilarity_basic(m1, m2, num_chosen_words=100, topn=10):
+  """Expects:
+  m1, m2: Two gensim word2vec model instances to calculate dissimilarity between
+  num_chosen_words: number of sampled words to use for comparison
+  topn: top n similar words to each sampled word to use for comparison
+
+  Returns:
+  Dissimilarity between two models, between 0 and 1
+  """
+
   dissimilarity = 0.0
   num_chosen_words = 2000
   topn = 10
