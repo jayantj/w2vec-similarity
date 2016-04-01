@@ -46,11 +46,22 @@ def model_similarity(m1, m2):
   divergence /= n
   return divergence
 
-
 if len(sys.argv) > 1:
   m1 = Word2Vec.load(sys.argv[1])
   m2 = Word2Vec.load(sys.argv[2])
-  cProfile.run('print model_similarity(m1, m2)')
+  method_name = sys.argv[3]
+  iterations = int(sys.argv[4]) if len(sys.argv) > 4 else 10
+  for i in range(iterations):
+    cProfile.run('print evaluate.%s(m1, m2)' % method_name, '../plots/stats-%d.stats' % i)
+  stats = pstats.Stats('../plots/stats-0.stats')
+  for i in range(1, iterations):
+    stats.add('../plots/stats-%d.stats' % i)
+  # Clean up filenames for the report
+  stats.strip_dirs()
+  # Sort the statistics by the cumulative time spent in the function
+  stats.sort_stats('tottime')
+  stats.print_stats(0.5)
+  pdb.set_trace()
 else:
   m1 = Word2Vec.load('models/text8-model-epochs-1-size-100')
   for epochs in range(1, 10):
