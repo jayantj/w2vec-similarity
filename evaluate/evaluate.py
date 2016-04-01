@@ -10,6 +10,7 @@ import matplotlib.colors as colors
 import random, sys, pdb, cProfile, time, json, os
 import mpld3
 import math
+import re
 
 SIMILARITY_DIR = 'models/similarity_matrices/new/'
 def model_dissimilarity(m1, m2, num_chosen_words=100, topn=10):
@@ -82,7 +83,7 @@ def model_dissimilarity(m1, m2, num_chosen_words=100, topn=10):
   # return (similarity_sum/(2*topn*num_chosen_words), diff_sum/num_chosen_words)
   return diff_sum/num_chosen_words
 
-def model_dissimilarity_word(given_word, given_model, target_model, topn = 10):
+def word_dissimilarity(given_word, given_model, target_model, topn = 10):
   """Expects:
   given_word: word from given_model vocab for which dissimilarity of target_model from given_model is to be computed 
   given_model, target_model: gensim word2vec model instances to calculate dissimilarity between
@@ -93,30 +94,30 @@ def model_dissimilarity_word(given_word, given_model, target_model, topn = 10):
   """
 
   # given_model.most_similar('man') => [(u'woman', 0.872), (u'person', 0.860)...]
-  given_most_similar_dict = {obj[0]:obj[1] for obj in given_model.most_similar(given_word, topn=topn)}
+  given_similar_words = {obj[0]:obj[1] for obj in given_model.most_similar(given_word, topn=topn)}
   dissimilarity = 0.0
 
   if not given_word in target_model:
-    dissimilarity += sum(given_most_similar_dict.values())/topn
+    dissimilarity += sum(given_similar_words.values())/topn
   else:
-    target_most_similar_dict = {obj[0]:obj[1] for obj in target_model.most_similar(given_word, topn=topn)}
-    union_most_similar_words = set(given_most_similar_dict.keys()) | set(target_most_similar_dict.keys())
-    for word in union_most_similar_words:
-      if word in given_most_similar_dict:
-        similarity_given_model = given_most_similar_dict[word]
+    target_similar_words = {obj[0]:obj[1] for obj in target_model.most_similar(given_word, topn=topn)}
+    union_similar_words = set(given_similar_words.keys()) | set(target_similar_words.keys())
+    for word in union_similar_words:
+      if word in given_similar_words:
+        similarity_given_model = given_similar_words[word]
       elif word in given_model.vocab:
         similarity_given_model = given_model.similarity(given_word, word)
       else:
         similarity_given_model = 0
 
-      if word in target_most_similar_dict:
-        similarity_target_model = target_most_similar_dict[word]
+      if word in target_similar_words:
+        similarity_target_model = target_similar_words[word]
       elif word in target_model.vocab:
         similarity_target_model = target_model.similarity(given_word, word)
       else:
         similarity_target_model = 0
       dissimilarity  += abs(similarity_given_model - similarity_target_model)
-    dissimilarity /= len(union_most_similar_words)
+    dissimilarity /= len(union_similar_words)
   return dissimilarity
 
 def model_dissimilarity_basic(m1, m2, num_chosen_words=100, topn=10):
@@ -128,18 +129,17 @@ def model_dissimilarity_basic(m1, m2, num_chosen_words=100, topn=10):
   Returns:
   Dissimilarity between two models, between 0 and 1
   """
-
   dissimilarity = 0.0
   num_chosen_words = 2000
   topn = 10
   m1_words = random.sample(m1.vocab.keys(), num_chosen_words/2)
   m2_words = random.sample(m2.vocab.keys(), num_chosen_words/2)
   for i in range(num_chosen_words/2):
-    word_dissimilarity = model_dissimilarity_word(m1_words[i], m1, m2, topn)
-    dissimilarity += word_dissimilarity
+    word_dissimilarity_score = word_dissimilarity(m1_words[i], m1, m2, topn)
+    dissimilarity += word_dissimilarity_score
 
-    word_dissimilarity = model_dissimilarity_word(m2_words[i], m2, m1, topn)
-    dissimilarity += word_dissimilarity
+    word_dissimilarity_score = word_dissimilarity(m2_words[i], m2, m1, topn)
+    dissimilarity += word_dissimilarity_score
   dissimilarity /= num_chosen_words
   return dissimilarity
 
@@ -269,7 +269,7 @@ def cluster_scatter_plot(similarity_file):
     model_name = os.path.splitext(os.path.basename(model_name))[0]
     cluster_label = similarity_data['doc2cluster'][model_name]
     point_colors.append(cmap(cluster_label))
-    labels.append(model_name)#"%s-%s"%(cluster_label, ''))#model_name.replace('gutenberg-', '')))
+    labels.append(re.compile(r"\s\([0-9]*\)-iter.*", re.IGNORECASE).split(model_name, 1)[0])
   embeddings = SpectralEmbedding(affinity='precomputed').fit_transform(np.array(similarity_data['similarity_matrix']))
   fig, ax = plt.subplots()
   x = embeddings[:, 0]
