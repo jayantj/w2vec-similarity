@@ -5,7 +5,7 @@ from glob import glob
 from nltk.corpus import PlaintextCorpusReader
 import importlib, pdb, os, chardet
 
-MODELS_DIR = 'models/gutenberg-top100/doc2vec/'
+MODELS_DIR = 'models/'
 
 def train_and_save(sents, output_file, options = {}):
   print "Training model..."
